@@ -1,0 +1,2 @@
+geopy==1.19.0
+pandarallel=1.1.0
