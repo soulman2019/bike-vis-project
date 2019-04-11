@@ -31,6 +31,7 @@ SJ_BBOX = {
 # categories
 ctypes = {
     'area': pd.CategoricalDtype(['East Bay', 'San Francisco', 'San Jose', 'Other', 'Unknown'], ordered=False),
+    'break': pd.CategoricalDtype(['No', 'Yes', 'Unknown'], ordered=False),
     'day_of_week': pd.CategoricalDtype(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Unknown'],
                                        ordered=True),
     'distance_type': pd.CategoricalDtype(['<1 km', '1-2 km', '2-3 km', '3-4 km', '4-5 km', '>5 km', 'Unknown'], ordered=True),
@@ -47,42 +48,49 @@ def load_data(preprocess_path='data/2017_preprocessed.csv'):
     Loads and preprocesses data. This may take a while if the data has not already been preprocessed.
     """
     if os.path.exists(preprocess_path):
-        data = pd.read_csv(preprocess_path)
-
-        # category types
-        data['start_area'] = data['start_area'].astype(dtype=ctypes['area'])
-        data['end_area'] = data['end_area'].astype(dtype=ctypes['area'])
-        data['start_day_of_week'] = data['start_day_of_week'].astype(dtype=ctypes['day_of_week'])
-        data['end_day_of_week'] = data['end_day_of_week'].astype(dtype=ctypes['day_of_week'])
-        data['distance_type'] = data['distance_type'].astype(dtype=ctypes['distance_type'])
-        data['member_gender'] = data['member_gender'].astype(dtype=ctypes['member_gender'])
-        data['start_month'] = data['start_month'].astype(dtype=ctypes['month'])
-        data['end_month'] = data['end_month'].astype(dtype=ctypes['month'])
-        data['trip_type'] = data['trip_type'].astype(dtype=ctypes['trip_type'])
-        data['user_type'] = data['user_type'].astype(dtype=ctypes['user_type'])
-
-        # int types
-        data['start_year'] = data['start_year'].parallel_map(int_or_unknown)
-        data['start_day'] = data['start_day'].parallel_map(int_or_unknown)
-        data['start_minute'] = data['start_minute'].parallel_map(int_or_unknown)
-        data['start_second'] = data['start_second'].parallel_map(int_or_unknown)
-
-        data['end_year'] = data['end_year'].parallel_map(int_or_unknown)
-        data['end_day'] = data['end_day'].parallel_map(int_or_unknown)
-        data['end_minute'] = data['end_minute'].parallel_map(int_or_unknown)
-        data['end_second'] = data['end_second'].parallel_map(int_or_unknown)
-
-        data['member_birth_year'] = data['member_birth_year'].parallel_map(int_or_unknown)
-
-        # float types
-        data['distance_km'] = data['distance_km'].parallel_map(float_or_unknown)
-
-        return data
+        return load_preprocessed(preprocess_path)
     else:
         data = pd.read_csv('data/2017.csv')
         preprocessed = preprocess(data)
         preprocessed.to_csv(preprocess_path, index=False)
         return preprocessed
+
+
+def load_preprocessed(preprocess_path):
+    data = pd.read_csv(preprocess_path)
+
+    # category types
+    data['start_area'] = data['start_area'].astype(dtype=ctypes['area'])
+    data['end_area'] = data['end_area'].astype(dtype=ctypes['area'])
+    data['start_day_of_week'] = data['start_day_of_week'].astype(dtype=ctypes['day_of_week'])
+    data['end_day_of_week'] = data['end_day_of_week'].astype(dtype=ctypes['day_of_week'])
+    data['distance_type'] = data['distance_type'].astype(dtype=ctypes['distance_type'])
+    data['member_gender'] = data['member_gender'].astype(dtype=ctypes['member_gender'])
+    data['start_month'] = data['start_month'].astype(dtype=ctypes['month'])
+    data['end_month'] = data['end_month'].astype(dtype=ctypes['month'])
+    data['trip_type'] = data['trip_type'].astype(dtype=ctypes['trip_type'])
+    data['user_type'] = data['user_type'].astype(dtype=ctypes['user_type'])
+    data['break'] = data['break'].astype(dtype=ctypes['break'])
+
+    # int types
+    data['start_year'] = data['start_year'].parallel_map(int_or_unknown)
+    data['start_day'] = data['start_day'].parallel_map(int_or_unknown)
+    data['start_minute'] = data['start_minute'].parallel_map(int_or_unknown)
+    data['start_second'] = data['start_second'].parallel_map(int_or_unknown)
+
+    data['end_year'] = data['end_year'].parallel_map(int_or_unknown)
+    data['end_day'] = data['end_day'].parallel_map(int_or_unknown)
+    data['end_minute'] = data['end_minute'].parallel_map(int_or_unknown)
+    data['end_second'] = data['end_second'].parallel_map(int_or_unknown)
+
+    data['member_birth_year'] = data['member_birth_year'].parallel_map(int_or_unknown)
+
+    # float types
+    data['distance_km'] = data['distance_km'].parallel_map(float_or_unknown)
+    data['duration_sec'] = data['duration_sec'].parallel_map(float_or_unknown)
+    data['speed'] = data['speed'].parallel_map(float_or_unknown)
+
+    return data
 
 
 def preprocess(data):
@@ -110,26 +118,19 @@ def preprocess(data):
     data['end_minute'] = end_time.parallel_map(get_minute)
     data['end_second'] = end_time.parallel_map(get_second)
 
-    # area
-    data['start_area'] = get_area(data, 'start_station_latitude', 'start_station_longitude')
-    data['end_area'] = get_area(data, 'end_station_latitude', 'end_station_longitude')
-
-    # trip type
-    data['trip_type'] = get_trip_type(data)
-
-    # distance
-    data['distance_km'] = get_distance_km(data)
-    data['distance_type'] = get_distance_type(data)
-
-    # gender
     data['member_gender'] = pd.Series(data['member_gender'], dtype=ctypes['member_gender'])
     data['member_gender'][data.member_gender.isna()] = 'Unknown'
-
-    # birth year
     data['member_birth_year'] = data.member_birth_year.parallel_map(get_birth_year)
-
-    # user type
     data['user_type'] = pd.Series(data['user_type'], dtype=ctypes['user_type'])
+
+    # infer new features from existing features
+    data['start_area'] = get_area(data, 'start_station_latitude', 'start_station_longitude')
+    data['end_area'] = get_area(data, 'end_station_latitude', 'end_station_longitude')
+    data['trip_type'] = get_trip_type(data)
+    data['distance_km'] = get_distance_km(data)
+    data['distance_type'] = get_distance_type(data)
+    data['speed'] = get_speed(data)
+    data['break'] = get_break(data)
 
     return data
 
@@ -302,3 +303,30 @@ def get_distance_type(data):
     categories = ['<1 km', '1-2 km', '2-3 km', '3-4 km', '4-5 km', '>5 km', 'Unknown']
     values = data.parallel_apply(get_row_distance_type, axis=1)
     return pd.Series(values, dtype=ctypes['distance_type'])
+
+
+def get_row_speed(row):
+    if row.distance_km == 'Unknown' or row.duration_sec == 'Unknown' or row.duration_sec == 0:
+        return 'Unknown'
+    duration_hour = row.duration_sec / 3600
+    return row.distance_km / duration_hour
+
+
+def get_speed(data):
+    return data.parallel_apply(get_row_speed, axis=1)
+
+
+def get_row_break(row):
+    if row.speed == 'Unknown':
+        return 'Unknown'
+    # if you bike at a speed of less than 1 km/h,
+    # then it probably safe to conclude that you
+    # had at least one stop
+    elif row.speed < 1:
+        return 'Yes'
+    else:
+        return 'No'
+
+
+def get_break(data):
+    return data.parallel_apply(get_row_break, axis=1)
