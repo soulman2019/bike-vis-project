@@ -1,9 +1,9 @@
 import datetime
 import geopy.distance
+import numpy as np
 import os
 import pandas as pd
 from pandarallel import pandarallel
-
 
 pandarallel.initialize()
 
@@ -30,6 +30,7 @@ SJ_BBOX = {
 
 # categories
 ctypes = {
+    'age_group': pd.CategoricalDtype(['0-9', '10-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70-79', '>80', 'Unknown'], ordered=True),
     'area': pd.CategoricalDtype(['East Bay', 'San Francisco', 'San Jose', 'Other', 'Unknown'], ordered=False),
     'break': pd.CategoricalDtype(['No', 'Yes', 'Unknown'], ordered=False),
     'day_of_week': pd.CategoricalDtype(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Unknown'],
@@ -38,6 +39,7 @@ ctypes = {
     'member_gender': pd.CategoricalDtype(['Male', 'Female', 'Unknown', 'Other'], ordered=False),
     'month': pd.CategoricalDtype(['January', 'February', 'March', 'April', 'May', 'June', 'July',
                                   'August', 'September', 'October', 'November', 'December', 'Unknown'], ordered=True),
+    'season': pd.CategoricalDtype(['Spring', 'Summer', 'Fall', 'Winter', 'Unknown'], ordered=True),
     'trip_type': pd.CategoricalDtype(['Single', 'Return', 'Unknown'], ordered=False),
     'user_type': pd.CategoricalDtype(['Customer', 'Subscriber'], ordered=False),
 }
@@ -71,6 +73,8 @@ def load_preprocessed(preprocess_path):
     data['trip_type'] = data['trip_type'].astype(dtype=ctypes['trip_type'])
     data['user_type'] = data['user_type'].astype(dtype=ctypes['user_type'])
     data['break'] = data['break'].astype(dtype=ctypes['break'])
+    data['season'] = data['season'].astype(dtype=ctypes['season'])
+    data['age_group'] = data['age_group'].astype(dtype=ctypes['age_group'])
 
     # int types
     data['start_year'] = data['start_year'].parallel_map(int_or_unknown)
@@ -84,9 +88,10 @@ def load_preprocessed(preprocess_path):
     data['end_second'] = data['end_second'].parallel_map(int_or_unknown)
 
     data['member_birth_year'] = data['member_birth_year'].parallel_map(int_or_unknown)
+    data['group_size'] = data['group_size'].parallel_map(int_or_unknown)
 
     # float types
-    data['distance_km'] = data['distance_km'].parallel_map(float_or_unknown)
+    data['distance_vincenty_km'] = data['distance_vincenty_km'].parallel_map(float_or_unknown)
     data['duration_sec'] = data['duration_sec'].parallel_map(float_or_unknown)
     data['speed'] = data['speed'].parallel_map(float_or_unknown)
 
@@ -127,10 +132,13 @@ def preprocess(data):
     data['start_area'] = get_area(data, 'start_station_latitude', 'start_station_longitude')
     data['end_area'] = get_area(data, 'end_station_latitude', 'end_station_longitude')
     data['trip_type'] = get_trip_type(data)
-    data['distance_km'] = get_distance_km(data)
+    data['distance_vincenty_km'] = get_distance_vincenty_km(data)
     data['distance_type'] = get_distance_type(data)
     data['speed'] = get_speed(data)
     data['break'] = get_break(data)
+    data['age_group'] = get_age_group(data)
+    data['season'] = get_season(data)
+    data['group_size'] = get_group_size(data)
 
     return data
 
@@ -252,10 +260,10 @@ def get_area(data, lattitude, longtitude):
 
 # https://stackoverflow.com/a/43211266/1211261
 def get_row_trip_type(row):
-    distance_km = get_row_distance_km(row)
-    if distance_km == 'Unknown':
+    distance_vincenty_km = get_row_distance_vincenty_km(row)
+    if distance_vincenty_km == 'Unknown':
         return 'Unknown'
-    elif distance_km < 0.3:
+    elif distance_vincenty_km < 0.3:
         return 'Return'
     else:
         return 'Single'
@@ -267,7 +275,7 @@ def get_trip_type(data):
     return pd.Series(values, dtype=ctypes['trip_type'])
 
 
-def get_row_distance_km(row):
+def get_row_distance_vincenty_km(row):
     start_lat = 'start_station_latitude'
     start_lon = 'start_station_longitude'
     end_lat = 'end_station_latitude'
@@ -278,22 +286,22 @@ def get_row_distance_km(row):
         return geopy.distance.vincenty((row[start_lat], row[start_lon]), (row[end_lat], row[end_lon])).km
 
 
-def get_distance_km(data):
-    return data.parallel_apply(get_row_distance_km, axis=1)
+def get_distance_vincenty_km(data):
+    return data.parallel_apply(get_row_distance_vincenty_km, axis=1)
 
 
 def get_row_distance_type(row):
-    if row.distance_km == 'Unknown':
+    if row.distance_vincenty_km == 'Unknown':
         return 'Unknown'
-    elif row.distance_km < 1:
+    elif row.distance_vincenty_km < 1:
         return '<1 km'
-    elif row.distance_km < 2:
+    elif row.distance_vincenty_km < 2:
         return '1-2 km'
-    elif row.distance_km < 3:
+    elif row.distance_vincenty_km < 3:
         return '2-3 km'
-    elif row.distance_km < 4:
+    elif row.distance_vincenty_km < 4:
         return '3-4 km'
-    elif row.distance_km < 5:
+    elif row.distance_vincenty_km < 5:
         return '4-5 km'
     else:
         return '>5 km'
@@ -306,10 +314,10 @@ def get_distance_type(data):
 
 
 def get_row_speed(row):
-    if row.distance_km == 'Unknown' or row.duration_sec == 'Unknown' or row.duration_sec == 0:
+    if row.distance_vincenty_km == 'Unknown' or row.duration_sec == 'Unknown' or row.duration_sec == 0:
         return 'Unknown'
     duration_hour = row.duration_sec / 3600
-    return row.distance_km / duration_hour
+    return row.distance_vincenty_km / duration_hour
 
 
 def get_speed(data):
@@ -330,3 +338,84 @@ def get_row_break(row):
 
 def get_break(data):
     return data.parallel_apply(get_row_break, axis=1)
+
+
+def get_row_age_group(row):
+    if row.member_birth_year == 'Unknown':
+        return 'Unknown'
+    age = 2019 - row.member_birth_year
+    if age < 10:
+        return '0-9'
+    elif age < 20:
+        return '10-19'
+    elif age < 30:
+        return '20-29'
+    elif age < 40:
+        return '30-39'
+    elif age < 50:
+        return '40-49'
+    elif age < 60:
+        return '50-59'
+    elif age < 70:
+        return '60-69'
+    elif age < 80:
+        return '70-79'
+    else:
+        return '>80'
+
+
+def get_age_group(data):
+    return data.parallel_apply(get_row_age_group, axis=1)
+
+
+def get_row_season(row):
+    month = row.start_month
+    if month == 'Unknown':
+        return 'Unknown'
+    elif month in ['March', 'April', 'May']:
+        return 'Spring'
+    elif month in ['June', 'July', 'August']:
+        return 'Summer'
+    elif month in ['September', 'October', 'November']:
+        return 'Fall'
+    else:
+        return 'Winter'
+
+
+def get_season(data):
+    return data.parallel_apply(get_row_season, axis=1)
+
+
+def get_row_group_size(row, data, stations):
+    if row.start_station_id == 'Unknown' or row.end_station_id == 'Unknown' or row.start_date == 'Unknown' or row.end_date == 'Unknown':
+        return 'Unknown'
+    else:
+        similar = stations[row.start_station_id][row.end_station_id]
+        similar = similar[(within_1_minute(similar.start_date, row.start_date)) & (within_1_minute(similar.end_date, row.end_date))]
+        return len(similar)
+
+
+def get_group_size(data):
+    # start -> end -> data
+    stations = {}
+    start_stations = data.start_station_id.unique()
+    end_stations = data.end_station_id.unique()
+    for start_station_id in start_stations:
+        if start_station_id != 'Unknown':
+            stations[start_station_id] = {}
+            for end_station_id in end_stations:
+                if end_station_id != 'Unknown':
+                    station_data = data[(data.start_station_id == start_station_id) & (data.end_station_id == end_station_id)]
+                    stations[start_station_id][end_station_id] = station_data
+
+    return data.parallel_apply(get_row_group_size, axis=1, args=(data, stations))
+
+
+def within_1_minute(dates, date):
+    deltas = dates - date
+    seconds = deltas.map(timedelta2seconds)
+    return seconds < 60
+
+
+def timedelta2seconds(timedelta):
+    return timedelta.seconds
