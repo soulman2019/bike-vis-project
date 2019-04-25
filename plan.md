@@ -1,15 +1,23 @@
 # Plan
 
 What needs to be done:
+0. Add all unprocessed datasets but remove unnecessary columns
+    * Uber census tracts zones (GeoJSON)
+    * Uber day of week (only start zone, end zone and duration)
+    * Uber hour of day (only start zone, end zone and duration)
+    * Bike sharing (only start station lon/lat, end station lon/lat, duration, start station id, end station id)
 1. Filter data
-    * Only in SF
+    * Only in SF - use SF_BBOX from data_loader.py
     * No return trips
     * No breaks
 2. Match bike stations and Uber zone
-    * Ray casting
+    * Ray casting - map station ids to Uber census tracts zones
+    * Export to a station-zone.csv file (or JSON)
 3. Generate datasets
-    * Day of week for both bike and Uber
-    * Hour of day for both bike and Uber
+    * Day of week for both bikes
+    * Day of week for both Uber
+    * Hour of day for bikes
+    * Hour of day for Uber
 
 At this point we can eventually split up and work on the observable notebook and the explainer notebook.
 
