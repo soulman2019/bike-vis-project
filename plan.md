@@ -5,7 +5,7 @@ What needs to be done:
     * Uber census tracts zones (GeoJSON)
     * Uber day of week (only start zone, end zone and duration)
     * Uber hour of day (only start zone, end zone and duration)
-    * Bike sharing (only start station lon/lat, end station lon/lat, duration, start station id, end station id)
+    * Bike sharing (only start station lon/lat, end station lon/lat, duration, start station id, end station id, start time, end time)
 2. Filter data
     * Only in SF - use SF_BBOX from data_loader.py
     * No return trips
