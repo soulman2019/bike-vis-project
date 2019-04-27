@@ -12,13 +12,13 @@ Duration is in seconds in all the datasets below.
 
 Day of week should be:
 
-    * Monday
-    * Tuesday
-    * Wednesday
-    * Thursday
-    * Friday
-    * Saturday
-    * Sunday
+* Monday
+* Tuesday
+* Wednesday
+* Thursday
+* Friday
+* Saturday
+* Sunday
 
 Hour of day is an integer between 0 and 23 (both inclusive).
 
