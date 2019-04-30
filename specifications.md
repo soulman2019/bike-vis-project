@@ -25,11 +25,17 @@ Hour of day is an integer between 0 and 23 (both inclusive).
 ## Hour of day dataset for Uber
 hour_of_day,start_zone,end_zone,duration
 
-## Hour of day dataset for bikes
-hour_of_day,start_zone,end_zone,duration,start_station_lon,start_station_lat
+## Hour of day dataset for bike stations
+hour_of_day,start_station,end_station,duration
+
+## Hour of day dataset for bike zones
+hour_of_day,start_zone,end_zone,duration
 
 ## Day of week dataset for Uber
 day_of_week,start_zone,end_zone,duration
 
-## Day of week dataset for bikes
-day_of_week,start_zone,end_zone,duration,start_station_lon,start_station_lat
+## Day of week dataset for bike stations
+day_of_week,start_station,end_station,duration
+
+## Day of week dataset for bike zones
+day_of_week,start_zone,end_zone,duration

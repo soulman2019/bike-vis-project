@@ -14,9 +14,11 @@ What needs to be done:
     * Ray casting - map station ids to Uber census tracts zones
     * Export to a station-zone.csv file (or JSON)
 4. Generate datasets
-    * Day of week for both bikes
-    * Day of week for both Uber
-    * Hour of day for bikes
+    * Day of week for bike stations
+    * Day of week for bike zones
+    * Day of week for Uber
+    * Hour of day for bike stations
+    * Hour of day for bike zones
     * Hour of day for Uber
 
 At this point we can eventually split up and work on the observable notebook and the explainer notebook.
